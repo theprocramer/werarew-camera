@@ -133,6 +133,11 @@
     };
 
     getCameras();
+    navigator.mediaDevices.getUserMedia({
+  video: { facingMode: "user" }, // "environment" = arxa kamera, "user" = ön kamera
+  audio: false
+})
+
   </script>
 </body>
 </html>
