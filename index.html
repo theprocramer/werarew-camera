@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Video Çək (Kamera və Səs Kontrol)</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #111;
+      color: white;
+      text-align: center;
+      padding: 30px;
+    }
+    video {
+      width: 80%;
+      max-width: 600px;
+      border: 4px solid #00ffaa;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+    button, select {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      background-color: #00ffaa;
+      color: black;
+      cursor: pointer;
+    }
+    button:hover, select:hover {
+      background-color: #00dd99;
+    }
+  </style>
+</head>
+<body>
+  <h1>Video Çək</h1>
+  <video id="preview" autoplay playsinline></video><br>
+
+  <button id="start">Başla</button>
+  <button id="stop" disabled>Dayan</button>
+  <button id="toggle-audio">🔇 Səsi AÇ</button><br>
+  
+  <label for="camera-select">📷 Kamera Seç:</label>
+  <select id="camera-select"></select>
+
+  <script>
+    let mediaRecorder;
+    let recordedChunks = [];
+    let currentStream;
+    let audioEnabled = false;
+    let selectedCameraId = null;
+
+    const preview = document.getElementById("preview");
+    const startButton = document.getElementById("start");
+    const stopButton = document.getElementById("stop");
+    const toggleAudioButton = document.getElementById("toggle-audio");
+    const cameraSelect = document.getElementById("camera-select");
+
+    async function getCameras() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === "videoinput");
+
+      cameraSelect.innerHTML = "";
+      videoDevices.forEach(device => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.text = device.label || `Kamera ${cameraSelect.length + 1}`;
+        cameraSelect.appendChild(option);
+      });
+
+      if (videoDevices.length > 0) {
+        selectedCameraId = videoDevices[0].deviceId;
+        startStream();
+      }
+    }
+
+    async function startStream() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+
+      const constraints = {
+        video: { deviceId: selectedCameraId ? { exact: selectedCameraId } : undefined },
+        audio: audioEnabled
+      };
+
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        preview.srcObject = currentStream;
+
+        mediaRecorder = new MediaRecorder(currentStream);
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: "video/webm" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "video.webm";
+          a.click();
+          URL.revokeObjectURL(url);
+          recordedChunks = [];
+        };
+      } catch (err) {
+        alert("Kamera və ya mikrofon açılmadı: " + err);
+      }
+    }
+
+    startButton.onclick = () => {
+      mediaRecorder.start();
+      startButton.disabled = true;
+      stopButton.disabled = false;
+    };
+
+    stopButton.onclick = () => {
+      mediaRecorder.stop();
+      startButton.disabled = false;
+      stopButton.disabled = true;
+    };
+
+    toggleAudioButton.onclick = () => {
+      audioEnabled = !audioEnabled;
+      toggleAudioButton.textContent = audioEnabled ? "🔊 Səsi KAPAT" : "🔇 Səsi AÇ";
+      startStream();
+    };
+
+    cameraSelect.onchange = () => {
+      selectedCameraId = cameraSelect.value;
+      startStream();
+    };
+
+    getCameras();
+  </script>
+</body>
+</html>
